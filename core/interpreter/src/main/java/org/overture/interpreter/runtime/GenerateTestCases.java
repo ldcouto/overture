@@ -128,7 +128,7 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		Element condition=(Element)xml_nodes.get(node.getLocation()).cloneNode(true);
 		fill_source_file_location(condition, node.getPredicate().getLocation());
 		currentElement.replaceChild(condition, xml_nodes.get(node.getLocation()));
-		xml_nodes.replace(node.getLocation(),condition);
+		xml_nodes.put(node.getLocation(),condition);
 		node.getPredicate().apply(this);
 	}
 
@@ -137,7 +137,7 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		Element condition=(Element)xml_nodes.get(node.getLocation()).cloneNode(true);
 		fill_source_file_location(condition, node.getPredicate().getLocation());
 		currentElement.replaceChild(condition, xml_nodes.get(node.getLocation()));
-		xml_nodes.replace(node.getLocation(),condition);
+		xml_nodes.put(node.getLocation(),condition);
 		node.getPredicate().apply(this);
 	}
 
@@ -175,7 +175,7 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		Element condition=(Element)xml_nodes.get(node.getLocation()).cloneNode(true);
 		fill_source_file_location(condition, node.getPredicate().getLocation());
 		currentElement.replaceChild(condition, xml_nodes.get(node.getLocation()));
-		xml_nodes.replace(node.getLocation(),condition);
+		xml_nodes.put(node.getLocation(),condition);
 		node.getPredicate().apply(this);
 	}
 
@@ -225,7 +225,7 @@ public class GenerateTestCases extends AnalysisAdaptor {
 				condition.appendChild(new_evaluation); 
 				}
 			currentElement.replaceChild(condition, conditions.item(i));
-			xml_nodes.replace(get_location(condition),condition);
+			xml_nodes.put(get_location(condition),condition);
 			}
 		
 		
@@ -273,7 +273,7 @@ public class GenerateTestCases extends AnalysisAdaptor {
 				condition.appendChild(new_evaluation); 
 				}
 			currentElement.replaceChild(condition, conditions.item(i));
-			xml_nodes.replace(get_location(condition),condition);
+			xml_nodes.put(get_location(condition),condition);
 			}
 		
 		
