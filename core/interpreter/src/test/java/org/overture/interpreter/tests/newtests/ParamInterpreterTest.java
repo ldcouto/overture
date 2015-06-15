@@ -70,7 +70,7 @@ public abstract class ParamInterpreterTest extends
 		}
 	}
 
-	private StringInterpreterResult wrap(Exception e) {
+	protected StringInterpreterResult wrap(Exception e) {
 
 		Vector<Message> errors = new Vector<Message>();
 		String message = e.getMessage();
@@ -105,7 +105,7 @@ public abstract class ParamInterpreterTest extends
 				errors);
 	}
 
-	private List<String> getEntries() throws IOException {
+	protected List<String> getEntries() throws IOException {
 		BufferedReader reader = new BufferedReader(new FileReader(
 				getEntryFile()));
 		List<String> data = new Vector<String>();
