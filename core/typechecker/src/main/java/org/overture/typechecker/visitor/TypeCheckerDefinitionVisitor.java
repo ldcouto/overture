@@ -21,6 +21,7 @@
  */
 package org.overture.typechecker.visitor;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Vector;
@@ -77,6 +78,7 @@ import org.overture.ast.statements.AExternalClause;
 import org.overture.ast.statements.ANotYetSpecifiedStm;
 import org.overture.ast.statements.ASubclassResponsibilityStm;
 import org.overture.ast.typechecker.NameScope;
+import org.overture.ast.typechecker.Pass;
 import org.overture.ast.types.ABooleanBasicType;
 import org.overture.ast.types.AClassType;
 import org.overture.ast.types.AFieldField;
@@ -97,6 +99,7 @@ import org.overture.typechecker.PrivateClassEnvironment;
 import org.overture.typechecker.TypeCheckInfo;
 import org.overture.typechecker.TypeChecker;
 import org.overture.typechecker.TypeCheckerErrors;
+import org.overture.typechecker.assistant.ITypeCheckerAssistantFactory;
 import org.overture.typechecker.assistant.definition.PAccessSpecifierAssistantTC;
 import org.overture.typechecker.utilities.DefinitionTypeResolver;
 import org.overture.typechecker.utilities.type.QualifiedDefinition;
@@ -487,7 +490,7 @@ public class TypeCheckerDefinitionVisitor extends AbstractTypeCheckVisitor
 
 		for (APatternListTypePair pltp : node.getParamPatterns())
 		{
-			argdefs.addAll(question.assistantFactory.createAPatternListTypePairAssistant().getDefinitions(pltp, NameScope.LOCAL));
+			argdefs.addAll(getDefinitions(pltp, NameScope.LOCAL, question.assistantFactory));
 		}
 
 		defs.addAll(question.assistantFactory.createPDefinitionAssistant().checkDuplicatePatterns(node, argdefs));
@@ -702,14 +705,12 @@ public class TypeCheckerDefinitionVisitor extends AbstractTypeCheckVisitor
 				local.add(question.assistantFactory.createPDefinitionAssistant().getSelfDefinition(node));
 			}
 
-			if (node.getName().getName().equals(node.getClassDefinition().getName().getName()))
+			if (node.getIsConstructor())
 			{
-				node.setIsConstructor(true);
-				node.getClassDefinition().setHasContructors(true);
-
-				if (question.assistantFactory.createPAccessSpecifierAssistant().isAsync(node.getAccess()))
+				if (question.assistantFactory.createPAccessSpecifierAssistant().isAsync(node.getAccess()) ||
+					question.assistantFactory.createPAccessSpecifierAssistant().isStatic(node.getAccess()))
 				{
-					TypeCheckerErrors.report(3286, "Constructor cannot be 'async'", node.getLocation(), node);
+					TypeCheckerErrors.report(3286, "Constructor cannot be 'async' or 'static'", node.getLocation(), node);
 				}
 
 				if (question.assistantFactory.createPTypeAssistant().isClass(((AOperationType) node.getType()).getResult()))
@@ -864,7 +865,7 @@ public class TypeCheckerDefinitionVisitor extends AbstractTypeCheckVisitor
 
 		for (APatternListTypePair ptp : node.getParameterPatterns())
 		{
-			argdefs.addAll(question.assistantFactory.createAPatternListTypePairAssistant().getDefinitions(ptp, NameScope.LOCAL));
+			argdefs.addAll(getDefinitions(ptp, NameScope.LOCAL, question.assistantFactory));
 		}
 
 		defs.addAll(question.assistantFactory.createPDefinitionAssistant().checkDuplicatePatterns(node, argdefs));
@@ -939,15 +940,12 @@ public class TypeCheckerDefinitionVisitor extends AbstractTypeCheckVisitor
 
 		if (question.env.isVDMPP())
 		{
-			if (node.getName().getName().equals(node.getClassDefinition().getName().getName()))
+			if (node.getIsConstructor())
 			{
-
-				node.setIsConstructor(true);
-				node.getClassDefinition().setHasContructors(true);
-
-				if (question.assistantFactory.createPAccessSpecifierAssistant().isAsync(node.getAccess()))
+				if (question.assistantFactory.createPAccessSpecifierAssistant().isAsync(node.getAccess()) ||
+					question.assistantFactory.createPAccessSpecifierAssistant().isStatic(node.getAccess()))
 				{
-					TypeCheckerErrors.report(3286, "Constructor cannot be 'async'", node.getLocation(), node);
+					TypeCheckerErrors.report(3286, "Constructor cannot be 'async' or 'static'", node.getLocation(), node);
 				}
 
 				if (question.assistantFactory.createPTypeAssistant().isClass(((AOperationType) node.getType()).getResult()))
@@ -1247,7 +1245,7 @@ public class TypeCheckerDefinitionVisitor extends AbstractTypeCheckVisitor
 
 		for (ATraceDefinitionTerm term : node.getTerms())
 		{
-			question.assistantFactory.createPTraceDefinitionAssistant().typeCheck(term.getList(), THIS, new TypeCheckInfo(question.assistantFactory, question.env, NameScope.NAMESANDSTATE));
+			typeCheck(term.getList(), THIS, new TypeCheckInfo(question.assistantFactory, question.env, NameScope.NAMESANDSTATE));
 		}
 
 		return null;
@@ -1491,10 +1489,16 @@ public class TypeCheckerDefinitionVisitor extends AbstractTypeCheckVisitor
 		ExcludedDefinitions.clearExcluded();
 		node.setExpType(expType);
 		PType type = node.getType(); // PDefinitionAssistant.getType(node);
+		
+		if (expType instanceof AUnknownType)
+		{
+			node.setPass(Pass.FINAL);	// Do it again later
+		}
+		
 		if (expType instanceof AVoidType)
 		{
 			TypeCheckerErrors.report(3048, "Expression does not return a value", node.getExpression().getLocation(), node.getExpression());
-		} else if (type != null)
+		} else if (type != null && !(type instanceof AUnknownType))
 		{
 			if (!question.assistantFactory.getTypeComparator().compatible(type, expType))
 			{
@@ -1603,6 +1607,31 @@ public class TypeCheckerDefinitionVisitor extends AbstractTypeCheckVisitor
 	{
 		return node.getCallStatement().apply(THIS, question);
 
+	}
+	
+	public void typeCheck(List<PTraceDefinition> term,
+			IQuestionAnswer<TypeCheckInfo, PType> rootVisitor,
+			TypeCheckInfo question) throws AnalysisException
+	{
+
+		for (PTraceDefinition def : term)
+		{
+			def.apply(rootVisitor, question);
+		}
+
+	}
+	
+	public Collection<? extends PDefinition> getDefinitions(
+			APatternListTypePair pltp, NameScope scope, ITypeCheckerAssistantFactory assistantFactory)
+	{
+		List<PDefinition> list = new Vector<PDefinition>();
+
+		for (PPattern p : pltp.getPatterns())
+		{
+			list.addAll(assistantFactory.createPPatternAssistant().getDefinitions(p, pltp.getType(), scope));
+		}
+
+		return list;
 	}
 
 }
