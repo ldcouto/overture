@@ -88,8 +88,6 @@ import org.overture.parser.config.Properties;
 
 public class StatementEvaluator extends DelegateExpressionEvaluator
 {
-    public CoverageToXML ctx;
-
 	@Override
 	public Value caseAAlwaysStm(AAlwaysStm node, Context ctxt)
 			throws AnalysisException
@@ -466,8 +464,7 @@ public class StatementEvaluator extends DelegateExpressionEvaluator
 	public Value caseAElseIfStm(AElseIfStm node, Context ctxt)
 			throws AnalysisException
 	{
-        ctx.setContext(ctxt);
-        node.apply(ctx);
+        node.apply(ctx,ctxt);
 		return evalElseIf(node, node.getLocation(), node.getElseIf(), node.getThenStm(), ctxt);
 	}
 
@@ -504,17 +501,17 @@ public class StatementEvaluator extends DelegateExpressionEvaluator
 		BreakpointManager.getBreakpoint(node).check(node.getLocation(), ctxt);
 		try
 		{
-			ctx.setContext(ctxt);
-			node.apply(ctx);
 			ValueSet values = node.getSet().apply(VdmRuntime.getStatementEvaluator(), ctxt).setValue(ctxt);
-
 			for (Value val : values)
 			{
 				try
 				{
 					Context evalContext = new Context(ctxt.assistantFactory, node.getLocation(), "for all", ctxt);
 					evalContext.putList(ctxt.assistantFactory.createPPatternAssistant().getNamedValues(node.getPattern(), val, ctxt));
+					//node.apply(ctx,ctxt);
+					//node.getStatement().apply(ctx,ctxt);
 					Value rv = node.getStatement().apply(VdmRuntime.getStatementEvaluator(), evalContext);
+					
 					if (!rv.isVoid())
 					{
 						return rv;
@@ -676,8 +673,8 @@ public class StatementEvaluator extends DelegateExpressionEvaluator
 
 	@Override
 	public Value caseAIfStm(AIfStm node, Context ctxt) throws AnalysisException
-	{   ctx.setContext(ctxt);
-        node.apply(ctx);
+	{	
+		node.apply(ctx, ctxt);
 		return evalIf(node, node.getLocation(), node.getIfExp(), node.getThenStm(), node.getElseIf(), node.getElseStm(), ctxt);
 	}
 
@@ -975,9 +972,9 @@ public class StatementEvaluator extends DelegateExpressionEvaluator
 	public Value caseAWhileStm(AWhileStm node, Context ctxt)
 			throws AnalysisException
 	{
-        ctx.setContext(ctxt);
-        node.apply(ctx);
-        node.getExp().apply(ctx);
+        
+        node.apply(ctx, ctxt);
+        node.getExp().apply(ctx, ctxt);
 		BreakpointManager.getBreakpoint(node).check(node.getLocation(), ctxt);
 
 		try
@@ -986,9 +983,8 @@ public class StatementEvaluator extends DelegateExpressionEvaluator
 			{
 				
 				Value rv = node.getStatement().apply(VdmRuntime.getStatementEvaluator(), ctxt);
-				ctx.setContext(ctxt);
-				node.apply(ctx);
-		        node.getExp().apply(ctx);
+				node.apply(ctx, ctxt);
+		        node.getExp().apply(ctx, ctxt);
 				if (!rv.isVoid())
 				{
 					return rv;

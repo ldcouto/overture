@@ -1,7 +1,5 @@
 package org.overture.interpreter.tests.coverage;
 
-import junit.framework.TestCase;
-
 import org.overture.ast.lex.Dialect;
 import org.overture.config.Release;
 import org.overture.config.Settings;
@@ -13,6 +11,10 @@ import org.overture.test.framework.BaseTestCase;
 import org.w3c.dom.Document;
 import org.xml.sax.SAXException;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -20,32 +22,29 @@ import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
+import junit.framework.TestCase;
 
+public class TestCoverageForAllStm extends BaseTestCase {
 
-public class TestCoverageIfStatement extends BaseTestCase {
     @Override
     public void test() throws Exception {
         Settings.release = Release.VDM_10;
-        Settings.dialect = Dialect.VDM_PP;
-        Value result = InterpreterUtil.interpret(Dialect.VDM_PP, "new Test().Run(2,3,4)", new File("src/test/resources/coverage/test_if_elseif_statements.vdmpp".replace('/', File.separatorChar)), true);
+        Settings.dialect = Dialect.VDM_SL;
+        Value result = InterpreterUtil.interpret(Dialect.VDM_SL, "TestForAllStm()", new File("src/test/resources/coverage/test_for_all_statements.vdmsl".replace('/', File.separatorChar)), true);
         System.out.println("Result: "+result.toString());
         Interpreter interpreter = Interpreter.getInstance();
-        File coverageFolder = new File("src/test/target/vdmpp-coverage/if-statement".replace('/', File.separatorChar));
+        File coverageFolder = new File("src/test/target/vdmsl-coverage/forall-statements".replace('/', File.separatorChar));
         coverageFolder.mkdirs();
         DBGPReaderV2.writeMCDCCoverage(interpreter, coverageFolder);
-
-        //Query result file
-
+        
         HashMap<String, String> queries = new HashMap<String, String>();
         queries.put("count(//if_statement)","1");
-        queries.put("count(//elseif)","1");
-        queries.put("//elseif/evaluation","false");
-        queries.put("//if_statement/evaluation","false");
-        
-        assertQueries("src/test/target/vdmpp-coverage/if-statement/test_if_elseif_statements.vdmpp.xml",queries);
+        queries.put("count(//if_statement/evaluation)","4");
+        queries.put("count(//if_statement/evaluation[.='false'])","1");
+        queries.put("count(//if_statement/evaluation[.='true'])","3");
+        queries.put("count(//if_statement/expression/not_equal/evaluation[.='false'])","1");
+        queries.put("count(//if_statement/expression/not_equal/evaluation[.='true'])","3");
+        assertQueries("src/test/target/vdmpp-coverage/if-statement/test_for_loop_statements.vdmpp.xml",queries);
     }
     
     public void assertQueries(String file_path, HashMap<String, String> queries){
@@ -74,6 +73,7 @@ public class TestCoverageIfStatement extends BaseTestCase {
                 try {
 					TestCase.assertEquals(engine.evaluate(query, doc), queries.get(query));
 				} catch (XPathExpressionException e) {
+					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
         }

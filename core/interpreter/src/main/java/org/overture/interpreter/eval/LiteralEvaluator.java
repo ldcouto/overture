@@ -22,7 +22,7 @@ import org.overture.interpreter.values.Value;
 
 public class LiteralEvaluator extends QuestionAnswerAdaptor<Context, Value>
 {
-
+	
 	@Override
 	public Value caseAIntLiteralExp(AIntLiteralExp node, Context ctxt)
 			throws AnalysisException

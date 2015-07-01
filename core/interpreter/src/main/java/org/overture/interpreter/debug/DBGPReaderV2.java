@@ -43,13 +43,17 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Vector;
 
+import org.overture.ast.analysis.AnalysisAdaptor;
 import org.overture.ast.analysis.AnalysisException;
 import org.overture.ast.analysis.DepthFirstAnalysisAdaptor;
 import org.overture.ast.definitions.AMutexSyncDefinition;
 import org.overture.ast.definitions.APerSyncDefinition;
 import org.overture.ast.definitions.PDefinition;
 import org.overture.ast.definitions.SClassDefinition;
+import org.overture.ast.expressions.AElseIfExp;
 import org.overture.ast.expressions.AHistoryExp;
+import org.overture.ast.expressions.AIfExp;
+import org.overture.ast.expressions.ARecordModifier;
 import org.overture.ast.expressions.PExp;
 import org.overture.ast.factory.AstFactory;
 import org.overture.ast.intf.lex.ILexNameToken;
@@ -59,11 +63,12 @@ import org.overture.ast.lex.LexNameToken;
 import org.overture.ast.lex.LexToken;
 import org.overture.ast.lex.VDMToken;
 import org.overture.ast.modules.AModuleModules;
+import org.overture.ast.node.INode;
 import org.overture.ast.statements.AElseIfStm;
+import org.overture.ast.statements.AForAllStm;
 import org.overture.ast.statements.AIfStm;
 import org.overture.ast.statements.AWhileStm;
 import org.overture.ast.util.definitions.ClassList;
-import org.overture.ast.util.modules.CombinedDefaultModule;
 import org.overture.config.Release;
 import org.overture.config.Settings;
 import org.overture.interpreter.VDMJ;
@@ -79,6 +84,8 @@ import org.overture.interpreter.runtime.ClassContext;
 import org.overture.interpreter.runtime.ClassInterpreter;
 import org.overture.interpreter.runtime.Context;
 import org.overture.interpreter.runtime.ContextException;
+import org.overture.interpreter.runtime.DecisionStructuresVisitor;
+import org.overture.interpreter.runtime.EliminateMaskedTests;
 import org.overture.interpreter.runtime.GenerateTestCases;
 import org.overture.interpreter.runtime.Interpreter;
 import org.overture.interpreter.runtime.ModuleInterpreter;
@@ -114,7 +121,6 @@ import org.overture.interpreter.values.Value;
 import org.overture.parser.config.Properties;
 import org.overture.parser.lex.LexException;
 import org.overture.parser.lex.LexTokenReader;
-import org.overture.typechecker.ModuleEnvironment;
 import org.overture.util.Base64;
 
 /**
@@ -1848,33 +1854,15 @@ public class DBGPReaderV2 extends DBGPReader implements Serializable {
 		for (File f : interpreter.getSourceFiles()) {
 			interpreter.getCoverage_to_xml().saveCoverageXml(coverage,
 					f.getName());
-			final GenerateTestCases gtc = new GenerateTestCases();
+			DecisionStructuresVisitor dsv = new DecisionStructuresVisitor();
+
 			if (interpreter instanceof ClassInterpreter) {
 				ClassInterpreter ci = (ClassInterpreter) interpreter;
 
 				for (SClassDefinition cdef : ci.getClasses()) {
 					try {
-						cdef.apply(new DepthFirstAnalysisAdaptor() {
-							@Override
-							public void caseAIfStm(AIfStm node)
-									throws AnalysisException {
-								node.apply(gtc);
-							}
-
-							public void caseAElseIfStm(AElseIfStm node)
-									throws AnalysisException {
-								node.apply(gtc);
-							}
-
-							@Override
-							public void caseAWhileStm(AWhileStm node)
-									throws AnalysisException {
-								node.apply(gtc);
-							}
-
-						});
+						cdef.apply(dsv);
 					} catch (AnalysisException e) {
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
 				}
@@ -1882,31 +1870,13 @@ public class DBGPReaderV2 extends DBGPReader implements Serializable {
 				ModuleInterpreter mi = (ModuleInterpreter) interpreter;
 				for (AModuleModules m : mi.getModules()) {
 					try {
-						m.apply(new DepthFirstAnalysisAdaptor() {
-							@Override
-							public void caseAIfStm(AIfStm node)
-									throws AnalysisException {
-								node.apply(gtc);
-							}
-
-							public void caseAElseIfStm(AElseIfStm node)
-									throws AnalysisException {
-								node.apply(gtc);
-							}
-
-							@Override
-							public void caseAWhileStm(AWhileStm node)
-									throws AnalysisException {
-								node.apply(gtc);
-							}
-						});
+						m.apply(dsv);
 					} catch (AnalysisException e) {
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
 				}
 			}
-			gtc.saveCoverageXml(coverage, f.getName());
+			dsv.getGTC().saveCoverageXml(coverage, f.getName());
 		}
 		Properties.parser_tabstop = 1;// required to match locations with the
 										// editor representation
