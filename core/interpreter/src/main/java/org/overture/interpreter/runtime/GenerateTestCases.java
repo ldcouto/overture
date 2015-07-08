@@ -13,6 +13,10 @@ import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 
 import org.overture.ast.analysis.AnalysisAdaptor;
 import org.overture.ast.analysis.AnalysisException;
@@ -40,7 +44,7 @@ public class GenerateTestCases extends AnalysisAdaptor {
 	private Element currentElement;
 	public HashMap<ILexLocation, Element> xml_nodes;
 
-	public GenerateTestCases() {
+	public GenerateTestCases(String file_name) {
 		DocumentBuilder db = null;
 		DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
 		try {
@@ -50,6 +54,9 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		}
 		this.doc = db.newDocument();
 		this.rootElement = doc.createElement("file");
+		Element fname = doc.createElement("file_name");
+		fname.setTextContent(file_name);
+		rootElement.appendChild(fname);
 		this.currentElement = rootElement;
 		this.doc.appendChild(rootElement);
 		this.xml_nodes = new HashMap<>();
@@ -60,19 +67,6 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		and.setAttribute("start_column", Integer.toString(local.getStartPos()));
 		and.setAttribute("end_line", Integer.toString(local.getEndLine()));
 		and.setAttribute("end_column", Integer.toString(local.getEndPos()));
-	}
-
-	public ILexLocation get_location(Element e) {
-		int sl = Integer.valueOf(e.getAttribute("start_line"));
-		int sc = Integer.valueOf(e.getAttribute("start_column"));
-		int el = Integer.valueOf(e.getAttribute("end_line"));
-		int ec = Integer.valueOf(e.getAttribute("end_column"));
-		for (ILexLocation l : xml_nodes.keySet()) {
-			if (l.getEndLine() == el && l.getEndPos() == ec
-					&& l.getStartLine() == sl && l.getStartPos() == sc)
-				return l;
-		}
-		return null;
 	}
 
 	public void saveCoverageXml(File coverage, String filename) {
@@ -108,19 +102,31 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		ILexLocation local = node.getLocation();
 		PExp exp = node.getIfExp();
 		Element if_statement = doc.createElement("if_statement");
+		Element source_code = doc.createElement("source_code");
+		source_code.setTextContent(node.getIfExp().toString());
+		if_statement.appendChild(source_code);
 		fill_source_file_location(if_statement, local);
 		currentElement = if_statement;
 		Element condition = doc.createElement("condition");
+		condition.appendChild(source_code.cloneNode(true));
 		fill_source_file_location(condition, exp.getLocation());
 		Element eval_true = doc.createElement("evaluation");
+		eval_true.setAttribute("tested", "false");
 		eval_true.setAttribute("n", "1");
 		eval_true.setTextContent("true");
 		condition.appendChild(eval_true);
 
 		Element eval_false = doc.createElement("evaluation");
+		eval_false.setAttribute("tested", "false");
 		eval_false.setAttribute("n", "2");
 		eval_false.setTextContent("false");
 		condition.appendChild(eval_false);
+
+		Element outcome = (Element) eval_true.cloneNode(true);
+		Element outcome2 = (Element) eval_false.cloneNode(true);
+
+		if_statement.appendChild(outcome);
+		if_statement.appendChild(outcome2);
 
 		currentElement.appendChild(condition);
 		rootElement.appendChild(if_statement);
@@ -159,19 +165,31 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		PExp exp = node.getElseIf();
 
 		Element elseif_statement = doc.createElement("elseif_statement");
+		Element source_code = doc.createElement("source_code");
+		source_code.setTextContent(node.getElseIf().toString());
+		elseif_statement.appendChild(source_code);
 		fill_source_file_location(elseif_statement, local);
 		currentElement = elseif_statement;
 		Element condition = doc.createElement("condition");
+		condition.appendChild(source_code.cloneNode(true));
 		fill_source_file_location(condition, exp.getLocation());
 		Element eval_true = doc.createElement("evaluation");
+		eval_true.setAttribute("tested", "false");
 		eval_true.setAttribute("n", "1");
 		eval_true.setTextContent("true");
 		condition.appendChild(eval_true);
 
 		Element eval_false = doc.createElement("evaluation");
+		eval_false.setAttribute("tested", "false");
 		eval_false.setAttribute("n", "2");
 		eval_false.setTextContent("false");
 		condition.appendChild(eval_false);
+
+		Element outcome = (Element) eval_true.cloneNode(true);
+		Element outcome2 = (Element) eval_false.cloneNode(true);
+
+		elseif_statement.appendChild(outcome);
+		elseif_statement.appendChild(outcome2);
 
 		currentElement.appendChild(condition);
 		rootElement.appendChild(elseif_statement);
@@ -198,19 +216,31 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		PExp exp = node.getExp();
 
 		Element while_statement = doc.createElement("while_statement");
+		Element source_code = doc.createElement("source_code");
+		source_code.setTextContent(node.getExp().toString());
+		while_statement.appendChild(source_code);
 		fill_source_file_location(while_statement, local);
 		currentElement = while_statement;
 		Element condition = doc.createElement("condition");
+		condition.appendChild(source_code.cloneNode(true));
 		fill_source_file_location(condition, exp.getLocation());
 		Element eval_true = doc.createElement("evaluation");
+		eval_true.setAttribute("tested", "false");
 		eval_true.setAttribute("n", "1");
 		eval_true.setTextContent("true");
 		condition.appendChild(eval_true);
 
 		Element eval_false = doc.createElement("evaluation");
+		eval_false.setAttribute("tested", "false");
 		eval_false.setAttribute("n", "2");
 		eval_false.setTextContent("false");
 		condition.appendChild(eval_false);
+
+		Element outcome = (Element) eval_true.cloneNode(true);
+		Element outcome2 = (Element) eval_false.cloneNode(true);
+
+		while_statement.appendChild(outcome);
+		while_statement.appendChild(outcome2);
 
 		currentElement.appendChild(condition);
 		rootElement.appendChild(while_statement);
@@ -225,10 +255,19 @@ public class GenerateTestCases extends AnalysisAdaptor {
 			throws AnalysisException {
 		Element previous_condition = (Element) xml_nodes
 				.get(node.getLocation()).cloneNode(true);
-		NodeList previous_evaluations = previous_condition.getChildNodes();
+		NodeList previous_evaluations = previous_condition
+				.getElementsByTagName("evaluation");
 
 		Element new_condition_left = doc.createElement("condition");
+		Element source_code_left = doc.createElement("source_code");
+		source_code_left.setTextContent(node.getLeft().toString());
+		new_condition_left.appendChild(source_code_left);
+
 		Element new_condition_right = doc.createElement("condition");
+		Element source_code_right = doc.createElement("source_code");
+		source_code_right.setTextContent(node.getRight().toString());
+		new_condition_right.appendChild(source_code_right);
+
 		fill_source_file_location(new_condition_left, node.getLeft()
 				.getLocation());
 		fill_source_file_location(new_condition_right, node.getRight()
@@ -245,6 +284,7 @@ public class GenerateTestCases extends AnalysisAdaptor {
 
 			if (content.equals("?")) {
 				Element new_eval_left = doc.createElement("evaluation");
+				new_eval_left.setAttribute("tested", "false");
 				new_eval_left.setAttribute("n", test_number);
 				new_eval_left.setTextContent("?");
 				Element new_eval_right = (Element) new_eval_left
@@ -254,6 +294,7 @@ public class GenerateTestCases extends AnalysisAdaptor {
 				new_condition_right.appendChild(new_eval_right);
 			} else if (content.equals("true")) {
 				Element new_eval_left = doc.createElement("evaluation");
+				new_eval_left.setAttribute("tested", "false");
 				new_eval_left.setAttribute("n", test_number);
 				new_eval_left.setTextContent("true");
 				Element new_eval_right = (Element) new_eval_left
@@ -263,35 +304,41 @@ public class GenerateTestCases extends AnalysisAdaptor {
 				new_condition_right.appendChild(new_eval_right);
 			} else {
 				Element new_eval_left = doc.createElement("evaluation");
+				new_eval_left.setAttribute("tested", "false");
 				new_eval_left.setAttribute("n", test_number);
 				new_eval_left.setTextContent("false");
 
 				Element new_eval_right = doc.createElement("evaluation");
+				new_eval_right.setAttribute("tested", "false");
 				new_eval_right.setAttribute("n", test_number);
-				new_eval_right.setTextContent("true ");
+				new_eval_right.setTextContent("true");
 
 				Element new_eval_left1 = doc.createElement("evaluation");
+				new_eval_left1.setAttribute("tested", "false");
 				new_eval_left1.setAttribute("n",
 						String.valueOf(1 + previous_evaluations.getLength()));
 				new_eval_left1.setTextContent("false");
 
 				Element new_eval_right1 = doc.createElement("evaluation");
+				new_eval_right1.setAttribute("tested", "false");
 				new_eval_right1.setAttribute("n",
 						String.valueOf(1 + previous_evaluations.getLength()));
 				new_eval_right1.setTextContent("?");
+
+				currentElement.appendChild(new_eval_left1.cloneNode(true));
 
 				duplicate_evaluation(test_number);
 
 				if (node.getRight() instanceof SBooleanBinaryExp) {
 					new_condition_left.appendChild(new_eval_left);
 					new_condition_right.appendChild(new_eval_right);
-					new_condition_left.appendChild(new_eval_left1);
-					new_condition_right.appendChild(new_eval_right1);
+					new_condition_left.appendChild(new_eval_right1);
+					new_condition_right.appendChild(new_eval_left1);
 				} else {
 					new_condition_left.appendChild(new_eval_right);
 					new_condition_right.appendChild(new_eval_left);
-					new_condition_left.appendChild(new_eval_right1);
-					new_condition_right.appendChild(new_eval_left1);
+					new_condition_left.appendChild(new_eval_left1);
+					new_condition_right.appendChild(new_eval_right1);
 				}
 
 			}
@@ -306,9 +353,10 @@ public class GenerateTestCases extends AnalysisAdaptor {
 	}
 
 	public void duplicate_evaluation(String evaluation_number) {
-		NodeList conditions = currentElement.getChildNodes();
+		NodeList conditions = currentElement.getElementsByTagName("condition");
 		for (int i = 0; i < conditions.getLength(); i++) {
-			NodeList evaluations = conditions.item(i).getChildNodes();
+			Element condition = (Element) conditions.item(i);
+			NodeList evaluations = condition.getElementsByTagName("evaluation");
 			for (int j = 0; j < evaluations.getLength(); j++) {
 				Element evaluation = (Element) evaluations.item(j);
 				if (evaluation.getAttribute("n").equals(evaluation_number)) {
@@ -327,10 +375,19 @@ public class GenerateTestCases extends AnalysisAdaptor {
 			throws AnalysisException {
 		Element previous_condition = (Element) xml_nodes
 				.get(node.getLocation()).cloneNode(true);
-		NodeList previous_evaluations = previous_condition.getChildNodes();
+		NodeList previous_evaluations = previous_condition
+				.getElementsByTagName("evaluation");
 
 		Element new_condition_left = doc.createElement("condition");
+		Element source_code_left = doc.createElement("source_code");
+		source_code_left.setTextContent(node.getLeft().toString());
+		new_condition_left.appendChild(source_code_left);
+
 		Element new_condition_right = doc.createElement("condition");
+		Element source_code_right = doc.createElement("source_code");
+		source_code_right.setTextContent(node.getRight().toString());
+		new_condition_right.appendChild(source_code_right);
+
 		fill_source_file_location(new_condition_left, node.getLeft()
 				.getLocation());
 		fill_source_file_location(new_condition_right, node.getRight()
@@ -348,6 +405,7 @@ public class GenerateTestCases extends AnalysisAdaptor {
 			if (content.equals("?")) {
 				Element new_eval_left = doc.createElement("evaluation");
 				new_eval_left.setAttribute("n", test_number);
+				new_eval_left.setAttribute("tested", "false");
 				new_eval_left.setTextContent("?");
 				Element new_eval_right = (Element) new_eval_left
 						.cloneNode(true);
@@ -357,6 +415,7 @@ public class GenerateTestCases extends AnalysisAdaptor {
 			} else if (content.equals("false")) {
 				Element new_eval_left = doc.createElement("evaluation");
 				new_eval_left.setAttribute("n", test_number);
+				new_eval_left.setAttribute("tested", "false");
 				new_eval_left.setTextContent("false");
 				Element new_eval_right = (Element) new_eval_left
 						.cloneNode(true);
@@ -366,10 +425,12 @@ public class GenerateTestCases extends AnalysisAdaptor {
 			} else {
 				Element new_eval_left = doc.createElement("evaluation");
 				new_eval_left.setAttribute("n", test_number);
+				new_eval_left.setAttribute("tested", "false");
 				new_eval_left.setTextContent("false");
 
 				Element new_eval_right = doc.createElement("evaluation");
 				new_eval_right.setAttribute("n", test_number);
+				new_eval_right.setAttribute("tested", "false");
 				new_eval_right.setTextContent("true");
 
 				Element new_eval_left1 = doc.createElement("evaluation");
@@ -377,6 +438,7 @@ public class GenerateTestCases extends AnalysisAdaptor {
 						"n",
 						String.valueOf(Integer.valueOf(test_number)
 								+ previous_evaluations.getLength()));
+				new_eval_left1.setAttribute("tested", "false");
 				new_eval_left1.setTextContent("true");
 
 				Element new_eval_right1 = doc.createElement("evaluation");
@@ -384,9 +446,12 @@ public class GenerateTestCases extends AnalysisAdaptor {
 						"n",
 						String.valueOf(Integer.valueOf(test_number)
 								+ previous_evaluations.getLength()));
+				new_eval_right1.setAttribute("tested", "false");
 				new_eval_right1.setTextContent("?");
 
 				duplicate_evaluation(test_number);
+
+				currentElement.appendChild(new_eval_left1.cloneNode(true));
 
 				if (node.getRight() instanceof SBooleanBinaryExp) {
 					new_condition_left.appendChild(new_eval_left);
@@ -418,26 +483,57 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		ILexLocation local = node.getLocation();
 		PExp exp = node.getTest();
 
-		Element if_statement = doc.createElement("if_expression");
-		fill_source_file_location(if_statement, local);
-		currentElement = if_statement;
+		Element if_expression = doc.createElement("if_expression");
+		fill_source_file_location(if_expression, local);
+		currentElement = if_expression;
+		Element source_code = doc.createElement("source_code");
+		source_code.setTextContent(node.getTest().toString());
+		if_expression.appendChild(source_code);
 		Element condition = doc.createElement("condition");
+		condition.appendChild(source_code.cloneNode(true));
 		fill_source_file_location(condition, exp.getLocation());
 		Element eval_true = doc.createElement("evaluation");
+		eval_true.setAttribute("tested", "false");
 		eval_true.setAttribute("n", "1");
 		eval_true.setTextContent("true");
 		condition.appendChild(eval_true);
 
 		Element eval_false = doc.createElement("evaluation");
+		eval_false.setAttribute("tested", "false");
 		eval_false.setAttribute("n", "2");
 		eval_false.setTextContent("false");
 		condition.appendChild(eval_false);
 
+		Element outcome = (Element) eval_true.cloneNode(true);
+		Element outcome2 = (Element) eval_false.cloneNode(true);
+
+		if_expression.appendChild(outcome);
+		if_expression.appendChild(outcome2);
+
 		currentElement.appendChild(condition);
-		rootElement.appendChild(if_statement);
-		xml_nodes.put(local, if_statement);
+		rootElement.appendChild(if_expression);
+		xml_nodes.put(local, if_expression);
 		xml_nodes.put(node.getTest().getLocation(), condition);
 		exp.apply(this);
 	}
 
+	public float getTestedRate() {
+		XPath xPath = XPathFactory.newInstance().newXPath();
+		NodeList tested =null, not_tested = null;
+		try {
+			not_tested = (NodeList) xPath
+					.evaluate(
+							"//evaluation[not(@n = ../preceding-sibling::evaluation/@n) and not(@n = ../following-sibling::evaluation/@n) and @tested='false']",
+							doc.getDocumentElement(), XPathConstants.NODESET);
+
+			tested = (NodeList) xPath
+					.evaluate(
+							"//evaluation[not(@n = ../preceding-sibling::evaluation/@n) and not(@n = ../following-sibling::evaluation/@n) and @tested='true']",
+							doc.getDocumentElement(), XPathConstants.NODESET);
+		} catch (XPathExpressionException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return (float) ((float) tested.getLength() * 100.0 / (float) ((float)not_tested.getLength() + (float)tested.getLength()));
+	}
 }
