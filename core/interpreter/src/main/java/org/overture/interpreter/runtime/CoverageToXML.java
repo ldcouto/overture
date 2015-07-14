@@ -737,6 +737,7 @@ public class CoverageToXML extends QuestionAdaptor<Context> {
 	}
 
 	public void mark_tested(GenerateTestCases gtc) {
+		try{
 		NodeList decisions = rootElement.getChildNodes();
 		for (int i = 0; i < decisions.getLength(); i++) {
 			Element decision = (Element) decisions.item(i);
@@ -788,6 +789,8 @@ public class CoverageToXML extends QuestionAdaptor<Context> {
 
 			}
 			
+		}}catch(Exception e){
+			e.printStackTrace();
 		}
 
 	}

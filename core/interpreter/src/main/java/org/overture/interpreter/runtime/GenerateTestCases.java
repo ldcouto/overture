@@ -1,18 +1,25 @@
 package org.overture.interpreter.runtime;
 
 import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HashMap;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Source;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.TransformerFactoryConfigurationError;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
+import javax.xml.transform.stream.StreamSource;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
@@ -28,12 +35,16 @@ import org.overture.ast.expressions.AForAllExp;
 import org.overture.ast.expressions.AIfExp;
 import org.overture.ast.expressions.ANotUnaryExp;
 import org.overture.ast.expressions.AOrBooleanBinaryExp;
+import org.overture.ast.expressions.APostOpExp;
+import org.overture.ast.expressions.APreOpExp;
 import org.overture.ast.expressions.PExp;
 import org.overture.ast.expressions.SBooleanBinaryExp;
 import org.overture.ast.intf.lex.ILexLocation;
 import org.overture.ast.statements.AElseIfStm;
+import org.overture.ast.statements.AForAllStm;
 import org.overture.ast.statements.AIfStm;
 import org.overture.ast.statements.AWhileStm;
+import org.overture.ast.statements.PStm;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
@@ -43,6 +54,7 @@ public class GenerateTestCases extends AnalysisAdaptor {
 	private Document doc;
 	private Element rootElement;
 	private Element currentElement;
+	public ArrayList<ILexLocation> visited_nodes;
 	public HashMap<ILexLocation, Element> xml_nodes;
 
 	public GenerateTestCases(String file_name) {
@@ -61,6 +73,7 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		this.currentElement = rootElement;
 		this.doc.appendChild(rootElement);
 		this.xml_nodes = new HashMap<>();
+		this.visited_nodes = new ArrayList<>();
 	}
 
 	public static void fill_source_file_location(Element and, ILexLocation local) {
@@ -85,21 +98,159 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		DOMSource source = new DOMSource(doc);
 		StreamResult result = new StreamResult(new File(coverage.getPath()
 				+ File.separator + filename + "test_cases.xml"));
+		
 		try {
 			transformer.transform(source, result);
 		} catch (TransformerException e) {
 			e.printStackTrace();
 		}
+		
+		generateHTMLTable(coverage,filename);
+		
+		
+	}
+	
+	@Override
+	public void caseAPostOpExp(APostOpExp node) throws AnalysisException {
+		ILexLocation local = node.getLocation();
+		PExp exp = node.getPostexpression();
+		Element if_statement = doc.createElement("post_expression");
+		Element source_code = doc.createElement("source_code");
+		source_code.setTextContent(exp.toString());
+		if_statement.appendChild(source_code);
+		fill_source_file_location(if_statement, local);
+		currentElement = if_statement;
+		Element condition = doc.createElement("condition");
+		condition.appendChild(source_code.cloneNode(true));
+		fill_source_file_location(condition, exp.getLocation());
+		Element eval_true = doc.createElement("evaluation");
+		eval_true.setAttribute("tested", "false");
+		eval_true.setAttribute("n", "1");
+		eval_true.setTextContent("true");
+		condition.appendChild(eval_true);
+
+		Element eval_false = doc.createElement("evaluation");
+		eval_false.setAttribute("tested", "false");
+		eval_false.setAttribute("n", "2");
+		eval_false.setTextContent("false");
+		condition.appendChild(eval_false);
+
+		Element outcome = (Element) eval_true.cloneNode(true);
+		Element outcome2 = (Element) eval_false.cloneNode(true);
+
+		if_statement.appendChild(outcome);
+		if_statement.appendChild(outcome2);
+
+		currentElement.appendChild(condition);
+		rootElement.appendChild(if_statement);
+		xml_nodes.put(local, if_statement);
+		xml_nodes.put(exp.getLocation(), condition);
+		visited_nodes.add(exp.getLocation());
+		exp.apply(this);
+		visited_nodes.add(node.getLocation());
+		
+	}
+
+	@Override
+	public void caseAPreOpExp(APreOpExp node) throws AnalysisException {
+		ILexLocation local = node.getLocation();
+		PExp exp = node.getExpression();
+		Element if_statement = doc.createElement("pre_expression");
+		Element source_code = doc.createElement("source_code");
+		source_code.setTextContent(exp.toString());
+		if_statement.appendChild(source_code);
+		fill_source_file_location(if_statement, local);
+		currentElement = if_statement;
+		Element condition = doc.createElement("condition");
+		condition.appendChild(source_code.cloneNode(true));
+		fill_source_file_location(condition, exp.getLocation());
+		Element eval_true = doc.createElement("evaluation");
+		eval_true.setAttribute("tested", "false");
+		eval_true.setAttribute("n", "1");
+		eval_true.setTextContent("true");
+		condition.appendChild(eval_true);
+
+		Element eval_false = doc.createElement("evaluation");
+		eval_false.setAttribute("tested", "false");
+		eval_false.setAttribute("n", "2");
+		eval_false.setTextContent("false");
+		condition.appendChild(eval_false);
+
+		Element outcome = (Element) eval_true.cloneNode(true);
+		Element outcome2 = (Element) eval_false.cloneNode(true);
+
+		if_statement.appendChild(outcome);
+		if_statement.appendChild(outcome2);
+
+		currentElement.appendChild(condition);
+		rootElement.appendChild(if_statement);
+		xml_nodes.put(local, if_statement);
+		xml_nodes.put(exp.getLocation(), condition);
+		visited_nodes.add(exp.getLocation());
+		exp.apply(this);
+		visited_nodes.add(node.getLocation());
+		
+	}
+
+	@Override
+	public void caseAForAllStm(AForAllStm node) throws AnalysisException {
+		ILexLocation local = node.getLocation();
+		PStm exp = node.getStatement();
+		Element if_statement = doc.createElement("forall_statement");
+		Element source_code = doc.createElement("source_code");
+		source_code.setTextContent(exp.toString());
+		if_statement.appendChild(source_code);
+		fill_source_file_location(if_statement, local);
+		currentElement = if_statement;
+		Element condition = doc.createElement("condition");
+		condition.appendChild(source_code.cloneNode(true));
+		fill_source_file_location(condition, exp.getLocation());
+		Element eval_true = doc.createElement("evaluation");
+		eval_true.setAttribute("tested", "false");
+		eval_true.setAttribute("n", "1");
+		eval_true.setTextContent("true");
+		condition.appendChild(eval_true);
+
+		Element eval_false = doc.createElement("evaluation");
+		eval_false.setAttribute("tested", "false");
+		eval_false.setAttribute("n", "2");
+		eval_false.setTextContent("false");
+		condition.appendChild(eval_false);
+
+		Element outcome = (Element) eval_true.cloneNode(true);
+		Element outcome2 = (Element) eval_false.cloneNode(true);
+
+		if_statement.appendChild(outcome);
+		if_statement.appendChild(outcome2);
+
+		currentElement.appendChild(condition);
+		rootElement.appendChild(if_statement);
+		xml_nodes.put(local, if_statement);
+		xml_nodes.put(exp.getLocation(), condition);
+		visited_nodes.add(exp.getLocation());
+		exp.apply(this);
+		visited_nodes.add(node.getLocation());
+		
 	}
 
 	@Override
 	public void caseANotUnaryExp(ANotUnaryExp node) throws AnalysisException {
+		NodeList evaluations = xml_nodes.get(node.getLocation()).getChildNodes();
+		for (int i = 0; i < evaluations.getLength(); i++) {
+			if(evaluations.item(i).getTextContent().equals("true"))evaluations.item(i).setTextContent("false");
+			else if(evaluations.item(i).getTextContent().equals("false"))evaluations.item(i).setTextContent("true");
+			else if(!evaluations.item(i).equals("?"))evaluations.item(i).setTextContent(node.getExp().toString());
+		}
+		fill_source_file_location(xml_nodes.get(node.getLocation()), node.getExp().getLocation());
 		PExp expression = node.getExp();
+		visited_nodes.add(node.getExp().getLocation());
 		expression.apply(this);
+		visited_nodes.add(node.getLocation());
 	}
 
 	@Override
 	public void caseAIfStm(AIfStm node) throws AnalysisException {
+		
 		ILexLocation local = node.getLocation();
 		PExp exp = node.getIfExp();
 		Element if_statement = doc.createElement("if_statement");
@@ -133,23 +284,70 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		rootElement.appendChild(if_statement);
 		xml_nodes.put(local, if_statement);
 		xml_nodes.put(node.getIfExp().getLocation(), condition);
+		visited_nodes.add(exp.getLocation());
 		exp.apply(this);
+		visited_nodes.add(node.getLocation());
 	}
 
 	@Override
 	public void caseAExists1Exp(AExists1Exp node) throws AnalysisException {
-		Element condition = (Element) xml_nodes.get(node.getLocation())
-				.cloneNode(true);
-		fill_source_file_location(condition, node.getPredicate().getLocation());
-		currentElement.replaceChild(condition,
-				xml_nodes.get(node.getLocation()));
-		xml_nodes.remove(node.getLocation());
-		xml_nodes.put(node.getLocation(), condition);
-		node.getPredicate().apply(this);
+		if (visited_nodes.contains(node.getLocation())){
+			Element condition = (Element) xml_nodes.get(node.getLocation())
+					.cloneNode(true);
+			fill_source_file_location(condition, node.getPredicate().getLocation());
+			currentElement.replaceChild(condition,
+					xml_nodes.get(node.getLocation()));
+			xml_nodes.remove(node.getLocation());
+			xml_nodes.put(node.getLocation(), condition);
+			visited_nodes.add(node.getPredicate().getLocation());
+			node.getPredicate().apply(this);
+			visited_nodes.add(node.getLocation());
+			}
+			else{
+				ILexLocation local = node.getLocation();
+				PExp exp = node.getPredicate();
+
+				Element elseif_statement = doc.createElement("exists1_expression");
+				Element source_code = doc.createElement("source_code");
+				source_code.setTextContent(exp.toString());
+				elseif_statement.appendChild(source_code);
+				fill_source_file_location(elseif_statement, local);
+				currentElement = elseif_statement;
+				Element condition = doc.createElement("condition");
+				condition.appendChild(source_code.cloneNode(true));
+				fill_source_file_location(condition, exp.getLocation());
+				Element eval_true = doc.createElement("evaluation");
+				eval_true.setAttribute("tested", "false");
+				eval_true.setAttribute("n", "1");
+				eval_true.setTextContent("true");
+				condition.appendChild(eval_true);
+
+				Element eval_false = doc.createElement("evaluation");
+				eval_false.setAttribute("tested", "false");
+				eval_false.setAttribute("n", "2");
+				eval_false.setTextContent("false");
+				condition.appendChild(eval_false);
+
+				Element outcome = (Element) eval_true.cloneNode(true);
+				Element outcome2 = (Element) eval_false.cloneNode(true);
+
+				elseif_statement.appendChild(outcome);
+				elseif_statement.appendChild(outcome2);
+
+				currentElement.appendChild(condition);
+				rootElement.appendChild(elseif_statement);
+				xml_nodes.put(local, elseif_statement);
+				xml_nodes.put(exp.getLocation(), condition);
+				visited_nodes.add(exp.getLocation());
+				exp.apply(this);
+				visited_nodes.add(node.getLocation());
+			}
+		
 	}
 
 	@Override
 	public void caseAExistsExp(AExistsExp node) throws AnalysisException {
+		if (visited_nodes.contains(node.getLocation())){
 		Element condition = (Element) xml_nodes.get(node.getLocation())
 				.cloneNode(true);
 		fill_source_file_location(condition, node.getPredicate().getLocation());
@@ -157,7 +355,49 @@ public class GenerateTestCases extends AnalysisAdaptor {
 				xml_nodes.get(node.getLocation()));
 		xml_nodes.remove(node.getLocation());
 		xml_nodes.put(node.getLocation(), condition);
+		visited_nodes.add(node.getPredicate().getLocation());
 		node.getPredicate().apply(this);
+		visited_nodes.add(node.getLocation());
+		}
+		else{
+			ILexLocation local = node.getLocation();
+			PExp exp = node.getPredicate();
+
+			Element elseif_statement = doc.createElement("exists_expression");
+			Element source_code = doc.createElement("source_code");
+			source_code.setTextContent(exp.toString());
+			elseif_statement.appendChild(source_code);
+			fill_source_file_location(elseif_statement, local);
+			currentElement = elseif_statement;
+			Element condition = doc.createElement("condition");
+			condition.appendChild(source_code.cloneNode(true));
+			fill_source_file_location(condition, exp.getLocation());
+			Element eval_true = doc.createElement("evaluation");
+			eval_true.setAttribute("tested", "false");
+			eval_true.setAttribute("n", "1");
+			eval_true.setTextContent("true");
+			condition.appendChild(eval_true);
+
+			Element eval_false = doc.createElement("evaluation");
+			eval_false.setAttribute("tested", "false");
+			eval_false.setAttribute("n", "2");
+			eval_false.setTextContent("false");
+			condition.appendChild(eval_false);
+
+			Element outcome = (Element) eval_true.cloneNode(true);
+			Element outcome2 = (Element) eval_false.cloneNode(true);
+
+			elseif_statement.appendChild(outcome);
+			elseif_statement.appendChild(outcome2);
+
+			currentElement.appendChild(condition);
+			rootElement.appendChild(elseif_statement);
+			xml_nodes.put(local, elseif_statement);
+			xml_nodes.put(exp.getLocation(), condition);
+			visited_nodes.add(exp.getLocation());
+			exp.apply(this);
+			visited_nodes.add(node.getLocation());
+		}
 	}
 
 	@Override
@@ -196,7 +436,9 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		rootElement.appendChild(elseif_statement);
 		xml_nodes.put(local, elseif_statement);
 		xml_nodes.put(node.getElseIf().getLocation(), condition);
+		visited_nodes.add(exp.getLocation());
 		exp.apply(this);
+		visited_nodes.add(node.getLocation());
 	}
 
 	@Override
@@ -235,11 +477,15 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		rootElement.appendChild(elseif_statement);
 		xml_nodes.put(local, elseif_statement);
 		xml_nodes.put(node.getElseIf().getLocation(), condition);
+		visited_nodes.add(exp.getLocation());
 		exp.apply(this);
+		visited_nodes.add(node.getLocation());
+		
 	}
 
 	@Override
 	public void caseAForAllExp(AForAllExp node) throws AnalysisException {
+		if (visited_nodes.contains(node.getLocation())){
 		Element condition = (Element) xml_nodes.get(node.getLocation())
 				.cloneNode(true);
 		fill_source_file_location(condition, node.getPredicate().getLocation());
@@ -247,7 +493,50 @@ public class GenerateTestCases extends AnalysisAdaptor {
 				xml_nodes.get(node.getLocation()));
 		xml_nodes.remove(node.getLocation());
 		xml_nodes.put(node.getLocation(), condition);
+		visited_nodes.add(node.getPredicate().getLocation());
 		node.getPredicate().apply(this);
+		visited_nodes.add(node.getLocation());
+		
+		}
+		else{
+			ILexLocation local = node.getLocation();
+			PExp exp = node.getPredicate();
+
+			Element elseif_statement = doc.createElement("forall_expression");
+			Element source_code = doc.createElement("source_code");
+			source_code.setTextContent(exp.toString());
+			elseif_statement.appendChild(source_code);
+			fill_source_file_location(elseif_statement, local);
+			currentElement = elseif_statement;
+			Element condition = doc.createElement("condition");
+			condition.appendChild(source_code.cloneNode(true));
+			fill_source_file_location(condition, exp.getLocation());
+			Element eval_true = doc.createElement("evaluation");
+			eval_true.setAttribute("tested", "false");
+			eval_true.setAttribute("n", "1");
+			eval_true.setTextContent("true");
+			condition.appendChild(eval_true);
+
+			Element eval_false = doc.createElement("evaluation");
+			eval_false.setAttribute("tested", "false");
+			eval_false.setAttribute("n", "2");
+			eval_false.setTextContent("false");
+			condition.appendChild(eval_false);
+
+			Element outcome = (Element) eval_true.cloneNode(true);
+			Element outcome2 = (Element) eval_false.cloneNode(true);
+
+			elseif_statement.appendChild(outcome);
+			elseif_statement.appendChild(outcome2);
+
+			currentElement.appendChild(condition);
+			rootElement.appendChild(elseif_statement);
+			xml_nodes.put(local, elseif_statement);
+			xml_nodes.put(exp.getLocation(), condition);
+			visited_nodes.add(exp.getLocation());
+			exp.apply(this);
+			visited_nodes.add(node.getLocation());
+		}
 	}
 
 	@Override
@@ -286,8 +575,9 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		rootElement.appendChild(while_statement);
 		xml_nodes.put(local, while_statement);
 		xml_nodes.put(node.getExp().getLocation(), condition);
+		visited_nodes.add(exp.getLocation());
 		exp.apply(this);
-
+		visited_nodes.add(node.getLocation());
 	}
 
 	@Override
@@ -387,9 +677,11 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		currentElement.appendChild(new_condition_left);
 		xml_nodes.put(node.getLeft().getLocation(), new_condition_left);
 		xml_nodes.put(node.getRight().getLocation(), new_condition_right);
-
+		visited_nodes.add(node.getLeft().getLocation());
+		visited_nodes.add(node.getRight().getLocation());
 		node.getLeft().apply(this);
 		node.getRight().apply(this);
+		visited_nodes.add(node.getLocation());
 	}
 
 	public void duplicate_evaluation(String evaluation_number) {
@@ -511,9 +803,11 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		currentElement.appendChild(new_condition_left);
 		xml_nodes.put(node.getLeft().getLocation(), new_condition_left);
 		xml_nodes.put(node.getRight().getLocation(), new_condition_right);
-
+		visited_nodes.add(node.getLeft().getLocation());
+		visited_nodes.add(node.getRight().getLocation());
 		node.getLeft().apply(this);
 		node.getRight().apply(this);
+		visited_nodes.add(node.getLocation());
 	}
 
 	@Override
@@ -553,7 +847,9 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		rootElement.appendChild(if_expression);
 		xml_nodes.put(local, if_expression);
 		xml_nodes.put(node.getTest().getLocation(), condition);
+		visited_nodes.add(exp.getLocation());
 		exp.apply(this);
+		visited_nodes.add(node.getLocation());
 	}
 
 	public float getTestedRate() {
@@ -574,5 +870,46 @@ public class GenerateTestCases extends AnalysisAdaptor {
 			e.printStackTrace();
 		}
 		return (float) ((float) tested.getLength() * 100.0 / (float) ((float)not_tested.getLength() + (float)tested.getLength()));
+	}
+
+	public void generateHTMLTable(File coverage, String f) {
+		TransformerFactory factory = null;
+		try {
+			factory = TransformerFactory.newInstance();
+		} catch (TransformerFactoryConfigurationError e) {
+			e.printStackTrace();
+		}
+		Source xslt = null;
+
+		try {
+			ClassLoader c1 = this.getClass().getClassLoader();
+			  try {
+				Enumeration<URL> urls =c1.getResources("MCDCTransformation.xsl");
+				URL url = urls.nextElement();
+				xslt = new StreamSource(url.toExternalForm());
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+				
+			
+		} catch (NullPointerException e) {
+			e.printStackTrace();
+		}
+		Transformer transformer = null;
+		try {
+			transformer = factory.newTransformer(xslt);
+		} catch (TransformerConfigurationException e) {
+			e.printStackTrace();
+		}
+
+		Source text = new StreamSource(new File(coverage.getPath()
+				+ File.separator + f + "test_cases.xml"));
+		try {
+			transformer.transform(text,
+					new StreamResult(new File(coverage.getPath()
+							+ File.separator + f + ".html")));
+		} catch (TransformerException e) {
+			e.printStackTrace();
+		}
 	}
 }
