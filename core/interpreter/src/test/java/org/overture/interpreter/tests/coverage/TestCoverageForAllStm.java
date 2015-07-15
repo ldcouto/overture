@@ -38,12 +38,7 @@ public class TestCoverageForAllStm extends BaseTestCase {
         DBGPReaderV2.writeMCDCCoverage(interpreter, coverageFolder);
         
         HashMap<String, String> queries = new HashMap<String, String>();
-        queries.put("count(//if_statement)","1");
-        queries.put("count(//if_statement/evaluation)","4");
-        queries.put("count(//if_statement/evaluation[.='false'])","1");
-        queries.put("count(//if_statement/evaluation[.='true'])","3");
-        queries.put("count(//if_statement/expression/not_equal/evaluation[.='false'])","1");
-        queries.put("count(//if_statement/expression/not_equal/evaluation[.='true'])","3");
+        queries.put("count(//for_all_expression)","1");
         assertQueries("src/test/target/vdmsl-coverage/forall-statements/test_for_all_statements.vdmsl.xml",queries);
     }
     

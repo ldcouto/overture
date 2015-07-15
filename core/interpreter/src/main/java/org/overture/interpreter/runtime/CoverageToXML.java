@@ -83,6 +83,28 @@ public class CoverageToXML extends QuestionAdaptor<Context> {
 		this.xml_nodes = new HashMap<>();
 	}
 
+	public void remove_empty_conditions(){
+		
+		XPathFactory xPathfactory = XPathFactory.newInstance();
+		XPath engine = xPathfactory.newXPath();
+		try {
+			NodeList empty = (NodeList) engine.compile("//*[not(*) and not(text())]").evaluate(doc,XPathConstants.NODESET);
+			for (int i = 0 ; i < empty.getLength();i++){
+				
+				Element emp  = (Element) empty.item(i);
+				emp.getParentNode().removeChild(emp);
+				
+			}
+			empty = (NodeList) engine.compile("//*[not(*) and not(text())]").evaluate(doc,XPathConstants.NODESET);
+			if (empty.getLength()>0)remove_empty_conditions();
+		} catch (XPathExpressionException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+	
+	
 	public ILexLocation get_location(Element e) {
 		int sl = Integer.valueOf(e.getAttribute("start_line"));
 		int sc = Integer.valueOf(e.getAttribute("start_column"));
@@ -582,120 +604,34 @@ public class CoverageToXML extends QuestionAdaptor<Context> {
 		}
 	}
 
-	public void mark_tested(GenerateTestCases gtc) {
-		try {
-			NodeList decisions = rootElement.getChildNodes();
-			for (int i = 0; i < decisions.getLength(); i++) {
-				Element decision = (Element) decisions.item(i);
-				Element generated = gtc.xml_nodes.get(get_location(decision));
-				NodeList expressions = decision
-						.getElementsByTagName("expression");
-				if (expressions != null) {
-					NodeList conditions = generated
-							.getElementsByTagName("condition");
-					HashMap<Integer, ArrayList<Integer>> test_numbers = new HashMap<Integer, ArrayList<Integer>>();
-					if (conditions != null) {
-						for (int j = 0; j < conditions.getLength(); j++) {
-							Element condition = (Element) conditions.item(j);
-							ILexLocation local = get_location(condition);
-							Element tested = xml_nodes.get(local);
-							NodeList evaluations = condition
-									.getElementsByTagName("evaluation");
-
-							for (int k = 0; k < evaluations.getLength(); k++) {
-								Element evaluation = (Element) evaluations
-										.item(k);
-								int test_number = Integer.valueOf(evaluation
-										.getAttribute("n"));
-								if (!test_numbers.containsKey(test_number))
-									test_numbers.put(test_number,
-											new ArrayList<Integer>());
-								NodeList tested_evaluation = tested
-										.getChildNodes();
-								for (int n = 0; n < tested_evaluation
-										.getLength(); n++) {
-									Element eval2 = (Element) tested_evaluation
-											.item(n);
-									int test_number2 = -1;
-									test_number2 = Integer.valueOf(eval2
-											.getAttribute("n"));
-									if (evaluation.getTextContent().equals("?")) {
-										if (!test_numbers.get(test_number)
-												.contains(test_number2)
-												&& j == 0) {
-											test_numbers.get(test_number).add(
-													test_number2);
-										}
-									} else if (eval2.getTextContent().equals(
-											evaluation.getTextContent())) {
-										if (!test_numbers.get(test_number)
-												.contains(test_number2)
-												&& j == 0) {
-											test_numbers.get(test_number).add(
-													test_number2);
-										}
-									} else if (!eval2.getTextContent().equals(
-											evaluation.getTextContent())) {
-										if (test_numbers.get(test_number)
-												.contains(test_number2)) {
-											test_numbers
-													.get(test_number)
-													.remove(test_numbers
-															.get(test_number)
-															.indexOf(
-																	test_number2));
-										}
-									}
-								}
-
-							}
-						}
-						
-
-					}
-
-				}
-
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-	}
+	
 
 	public void mark_tested2(GenerateTestCases gtc)	throws XPathExpressionException {
+		
 		XPathFactory xPathfactory = XPathFactory.newInstance();
 		XPath engine = xPathfactory.newXPath();
-			HashMap<Element, ArrayList<String> > values_set= new HashMap<Element, ArrayList <String> >();
+			ArrayList<Element> values_set= new ArrayList <Element> ();
 			int index = 1;
-			int index2 = 1;
-			String n="  ";
 			Element decision = doc.createElement("new");
 			while(decision!=null){
-				decision = (Element) engine.compile("/file/*[name(.)!='file_name']["+index2+"]").evaluate(doc,XPathConstants.NODE);
+				decision = (Element) engine.compile("/file/*[name(.)!='file_name'  and ./expression]["+index+"]").evaluate(doc,XPathConstants.NODE);
 				if(decision==null)break;
-				values_set.put(decision, new ArrayList<String>());
-			while(!n.equals("")){
-				n = (String) engine.compile("file/*["+index+"]//evaluation/@n[name(.)!='file_name']["+index2+"]").evaluate(doc,XPathConstants.STRING);
-			    index++;
-			    if(n.equals(""))break;
-			    values_set.get(decision).add(n);
+				String p = prep(decision);
+				Element generated_decision = (Element) engine.compile("//*["+p+"]").evaluate(gtc.doc,XPathConstants.NODE);
+				compare(generated_decision, gtc);
+			index++;
 			}
-			index2++;
-			}
-			for(Element e: values_set.keySet())compare(e,values_set.get(e),gtc);
 	}
 
-	private void compare(Element e,ArrayList<String> values_set, GenerateTestCases gtc) {
-		Element generated_decision = gtc.xml_nodes.get(get_location(e));
+	private void compare(Element e, GenerateTestCases gtc) {
+		Element generated_decision = e;//gtc.xml_nodes.get(get_location(e));
 		NodeList generated_conditions = generated_decision.getElementsByTagName("condition");
 		HashMap<Integer, ArrayList<Integer>> test_numbers = new HashMap<Integer, ArrayList<Integer>>();
-		System.out.println("generated_decision->"+generated_decision);
+		
 		for(int i=0; i< generated_conditions.getLength(); i++){
 			Element generated_condition = (Element) generated_conditions.item(i);
 			NodeList generated_evaluations = generated_condition.getElementsByTagName("evaluation");
 			Element captured_condition = xml_nodes.get(get_location(generated_condition));
-			System.out.println("captured_condition->"+captured_condition);
 			for(int k =0;k<generated_evaluations.getLength(); k++){
 				Element evaluation = (Element) generated_evaluations.item(k);
 				Integer test_number = Integer.valueOf(evaluation.getAttribute("n"));
@@ -707,17 +643,13 @@ public class CoverageToXML extends QuestionAdaptor<Context> {
 				for(int n = 0;n<captured_evaluations.getLength();n++){
 						Element eval = (Element) captured_evaluations.item(n);
 						Integer test_number2 = Integer.valueOf(eval.getAttribute("n"));
-						System.out.println("content->"+content+" test_number->"+test_number+" content2->"+eval.getTextContent()+" test_number->"+test_number2);
 						if(content.equals("?") && test_numbers.get(test_number).contains(test_number2)){
 							test_numbers.get(test_number).remove(test_number2);
-							System.out.println("REMOVI!");
 						}else if(n==0 && eval.getTextContent().equals(content) && !test_numbers.get(test_number).contains(test_number2)){
 							test_numbers.get(test_number).add(test_number2);
-							System.out.println("ADICIONEI!");
 							}
 						else if(!eval.getTextContent().equals(content) && test_numbers.get(test_number).contains(test_number2)){
 							test_numbers.get(test_number).remove(test_number2);
-							System.out.println("REMOVI!");
 						
 						}
 						
@@ -726,7 +658,6 @@ public class CoverageToXML extends QuestionAdaptor<Context> {
 		}
 		for (int tn : test_numbers.keySet()) {
 			if (!test_numbers.get(tn).isEmpty()) {
-				System.out.println("COVERED A TEST!");
 				setTested(generated_decision, String.valueOf(tn));
 			}
 		}

@@ -536,6 +536,7 @@ public class TraceRunnerMain implements IProgressMonitor {
 		MCDCReport mcdc = new MCDCReport();
 		for (File f : interpreter.getSourceFiles()) {
 			temp = f;
+			interpreter.getCoverage_to_xml().remove_empty_conditions();
 			interpreter.getCoverage_to_xml().saveCoverageXml(coverage,
 					f.getName());
 			DecisionStructuresVisitor dsv = new DecisionStructuresVisitor(

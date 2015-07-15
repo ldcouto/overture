@@ -76,6 +76,8 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		this.xml_nodes = new HashMap<>();
 		this.visited_nodes = new ArrayList<>();
 	}
+	
+	
 
 	public static void fill_source_file_location(Element and, ILexLocation local) {
 		and.setAttribute("start_line", Integer.toString(local.getStartLine()));
@@ -105,7 +107,6 @@ public class GenerateTestCases extends AnalysisAdaptor {
 		} catch (TransformerException e) {
 			e.printStackTrace();
 		}
-
 		generateHTMLTable(coverage,filename);
 
 	}
